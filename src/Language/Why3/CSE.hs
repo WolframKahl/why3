@@ -36,7 +36,7 @@ cseFormula (startName,e) =
     in ( newUses
        , case Map.lookup i useMap of
            Just 1 -> apSubst (Map.singleton i d) e1
-           _      -> Let (PVar i) d e1
+           _      -> Let False (PVar i) d e1
        )
 
 
@@ -65,7 +65,7 @@ importFormula expr =
          e3' <- importFormula e3
          return (If e1' e2' e3')
 
-    Let p e1 e2   ->
+    Let bGhost p e1 e2   ->
       case p of
         PWild   -> importFormula e2
         PVar x  -> do e1' <- importTerm e1
@@ -74,7 +74,7 @@ importFormula expr =
 
         PCon {} -> do e1' <- importTerm e1
                       e2' <- importFormula e2
-                      return (Let p e1' e2')
+                      return (Let bGhost p e1' e2')
 
     -- XXX: No sharing across qunatifiers.
     Quant q xs ts e ->
@@ -118,7 +118,7 @@ importTerm expr =
 
     Match {}    -> error "XXX: importTerm Match"
 
-    Let p e1 e2   ->
+    Let bGhost p e1 e2   ->
       case p of
         PWild   -> importTerm e2
 
@@ -128,7 +128,7 @@ importTerm expr =
 
         PCon {} -> do e1' <- importTerm e1
                       e2' <- importTerm e2
-                      return (Let p e1' e2')
+                      return (Let bGhost p e1' e2')
 
     Quant {}    -> error "Not a term: quant"
     Conn {}     -> error "Not a term: conn"

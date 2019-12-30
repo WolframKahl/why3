@@ -21,15 +21,8 @@ import qualified Data.Map as Map
 import qualified Data.Map.Strict as MapStrict
 import           Data.Set  ( Set )
 import qualified Data.Set as Set
-
 import qualified Data.Text as Text
 
-#if MIN_VERSION_base(4,8,0)
-import           Data.Monoid ((<>))
-#else
-import           Data.Monoid (Monoid(..), (<>))
-import           Data.Foldable (foldMap)
-#endif
 
 -- | Find free names in an expression
 freeNames :: Expr -> Set Name
@@ -56,7 +49,9 @@ countUses = getCount . go
       Quant _ xs _ e -> forgetMany (map fst xs) (go e)
       Match es as    -> foldMap go es <> foldMap alt as
           where alt (p,e) = forgetMany (Set.toList (patDefines p)) (go e)
-      Let p e1 e2    -> go e1 <> forgetMany (Set.toList (patDefines p)) (go e2)
+
+      Let _b p e1 e2
+       -> go e1 <> forgetMany (Set.toList (patDefines p)) (go e2)
 
 countOne :: k -> Count k
 countOne k = Count (Map.singleton k 1)
@@ -68,6 +63,9 @@ forgetMany :: Ord k => [k] -> Count k -> Count k
 forgetMany ks count = foldl' (flip forget) count ks
 
 newtype Count k = Count { getCount :: Map k Int }
+
+instance Ord k => Semigroup (Count k) where
+  (<>) = mappend
 
 instance Ord k => Monoid (Count k) where
   mempty = Count Map.empty
@@ -97,8 +95,9 @@ rename used0 = go (Map.fromList [ (x,x) | x <- Set.toList used0 ])
 
       App x es            -> App (getName nm x) (map (go nm) es)
 
-      Let p e1 e2         -> let (nm1,p1) = renP nm p
-                             in Let p1 (go nm e1) (go nm1 e2)
+      Let b p e1 e2
+       -> let (nm1,p1) = renP nm p
+          in  Let b p1 (go nm e1) (go nm1 e2)
 
       Quant q xs trs e    -> let (nm1, ys) = mapAccumL renQ nm xs
                              in Quant q ys (map (map (go nm1)) trs) (go nm1 e)
@@ -153,8 +152,9 @@ apSubst = go
           in (p, go env1 e)
 
       -- Here we assume no captrue
-      Let p e1 e2         -> Let p (go env e1) (go env1 e2)
-        where
+      Let bGhost p e1 e2
+       -> Let bGhost p (go env e1) (go env1 e2)
+       where
         env1 = let defs = patDefines p
                in Map.filterWithKey (\x _ -> not (x `Set.member` defs)) env
 

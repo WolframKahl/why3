@@ -123,6 +123,7 @@ $white+                   { emit $ White Space }
 "true"                     { emit $ KW KW_true   }
 "false"                    { emit $ KW KW_false  }
 
+"module"                   { emit $ KW KW_module }
 "theory"                   { emit $ KW KW_theory }
 "type"                     { emit $ KW KW_type }
 "constant"                 { emit $ KW KW_constant }
@@ -138,7 +139,17 @@ $white+                   { emit $ White Space }
 "namespace"                { emit $ KW KW_namespace }
 "import"                   { emit $ KW KW_import }
 "export"                   { emit $ KW KW_export }
+"assert"                   { emit $ KW KW_assert }
+"ghost"                    { emit $ KW KW_ghost  }
 
+"requires"                 { emit $ KW KW_requires }
+"ensures"                  { emit $ KW KW_ensures  }
+"invariant"                { emit $ KW KW_invariant }
+
+"for"                      { emit $ KW KW_for }
+"to"                       { emit $ KW KW_to }
+"do"                       { emit $ KW KW_do }
+"done"                     { emit $ KW KW_done }
 
 @integer                   { emitS numToken }
 @real                      { emit RealTok }

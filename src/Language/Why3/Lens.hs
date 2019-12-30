@@ -46,8 +46,8 @@ module Language.Why3.Lens
   , _PCon
   , _Forall
   , _Exists
-  , theoryName
-  , theoryDecls
+  , moduleName
+  , moduleDecls
   , tyCaseAltName
   , tyCaseAltLabels
   , tyCaseAltTyParams
@@ -86,7 +86,7 @@ prism' bt seta =
 
 exprPlate                      :: Applicative f => (Expr -> f Expr) -> (Expr -> f Expr)
 exprPlate f (App n es)          = App n <$> traverse f es
-exprPlate f (Let ps e1 e2)      = Let ps <$> f e1 <*> f e2
+exprPlate f (Let b ps e1 e2)    = Let b ps <$> f e1 <*> f e2
 exprPlate f (If e1 e2 e3)       = If <$> f e1 <*> f e2 <*> f e3
 exprPlate f (Match es alts)     = Match <$> traverse f es <*> traverse (_2 f) alts
 exprPlate f (Conn c e1 e2)      = Conn c <$> f e1 <*> f e2
@@ -108,11 +108,11 @@ _App                            = prism' remitter reviewer
   reviewer (App n es)           = Just (n,es)
   reviewer _                    = Nothing
 
-_Let                           :: Prism' Expr (Pattern, Expr, Expr)
+_Let                           :: Prism' Expr (Bool, Pattern, Expr, Expr)
 _Let                            = prism' remitter reviewer
   where
-  remitter     (ps,e1,e2)       = Let ps e1 e2
-  reviewer (Let ps e1 e2)       = Just (ps,e1,e2)
+  remitter     (b,ps,e1,e2)       = Let b ps e1 e2
+  reviewer (Let b ps e1 e2)       = Just (b,ps,e1,e2)
   reviewer _                    = Nothing
 
 _If                            :: Prism' Expr (Expr, Expr, Expr)
@@ -379,13 +379,13 @@ _Exists                         = prism' remitter reviewer
   reviewer Exists               = Just ()
   reviewer _                    = Nothing
 
--- Theory Lenses
+-- Module Lenses
 
-theoryName                     :: Lens' Theory Name
-theoryName f (Theory n ds)      = (`Theory` ds) <$> f n
+moduleName                     :: Lens' Module Name
+moduleName f (Module n ds)      = (`Module` ds) <$> f n
 
-theoryDecls                    :: Lens' Theory [Decl]
-theoryDecls f (Theory n ds)     = Theory n <$> f ds
+moduleDecls                    :: Lens' Module [Decl]
+moduleDecls f (Module n ds)     = Module n <$> f ds
 
 -- TyCaseAlt Lenses
 

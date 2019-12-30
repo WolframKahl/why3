@@ -6,7 +6,7 @@
 module Language.Why3.Parser
   ( parse
   , ParseM
-  , theories
+  , modules
   , expr
   , pType
   ) where
@@ -24,86 +24,98 @@ import qualified Control.Applicative as A
 
 
 %token
-  INTEGER     { Token { tokenType = Num $$ _ } }
-  REAL        { Token { tokenType = RealTok, tokenText = Lazy.toStrict -> $$ } }
-  STR         { Token { tokenType = StrLit (Lazy.toStrict -> $$) } }
+  INTEGER       { Token { tokenType = Num $$ _ } }
+  REAL          { Token { tokenType = RealTok, tokenText = Lazy.toStrict -> $$ } }
+  STR           { Token { tokenType = StrLit (Lazy.toStrict -> $$) } }
 
-  LIDENT      { Token { tokenType = Ident Unqual Lower, tokenText = Lazy.toStrict -> $$ } }
-  UIDENT      { Token { tokenType = Ident Unqual Upper, tokenText = Lazy.toStrict -> $$ } }
-  QLIDENT     { Token { tokenType = Ident Qual   Lower, tokenText = Lazy.toStrict -> $$ } }
-  QUIDENT     { Token { tokenType = Ident Qual   Upper, tokenText = Lazy.toStrict -> $$ } }
-  TQUALID     { Token { tokenType = TIdent,             tokenText = Lazy.toStrict -> $$ } }
+  LIDENT        { Token { tokenType = Ident Unqual Lower, tokenText = Lazy.toStrict -> $$ } }
+  UIDENT        { Token { tokenType = Ident Unqual Upper, tokenText = Lazy.toStrict -> $$ } }
+  QLIDENT       { Token { tokenType = Ident Qual   Lower, tokenText = Lazy.toStrict -> $$ } }
+  QUIDENT       { Token { tokenType = Ident Qual   Upper, tokenText = Lazy.toStrict -> $$ } }
+  TQUALID       { Token { tokenType = TIdent,             tokenText = Lazy.toStrict -> $$ } }
 
-  BANG_OP     { Token { tokenType = Op BangOp,      tokenText = Lazy.toStrict -> $$ } }
-  OP4         { Token { tokenType = Op (OtherOp 4), tokenText = Lazy.toStrict -> $$ } }
-  OP3         { Token { tokenType = Op (OtherOp 3), tokenText = Lazy.toStrict -> $$ } }
-  OP2         { Token { tokenType = Op (OtherOp 2), tokenText = Lazy.toStrict -> $$ } }
-  OP1         { Token { tokenType = Op (OtherOp 1), tokenText = Lazy.toStrict -> $$ } }
+  BANG_OP       { Token { tokenType = Op BangOp,      tokenText = Lazy.toStrict -> $$ } }
+  OP4           { Token { tokenType = Op (OtherOp 4), tokenText = Lazy.toStrict -> $$ } }
+  OP3           { Token { tokenType = Op (OtherOp 3), tokenText = Lazy.toStrict -> $$ } }
+  OP2           { Token { tokenType = Op (OtherOp 2), tokenText = Lazy.toStrict -> $$ } }
+  OP1           { Token { tokenType = Op (OtherOp 1), tokenText = Lazy.toStrict -> $$ } }
 
-  '['         { Token { tokenType = Sym BracketL, tokenPos = $$ }}
-  ']'         { Token { tokenType = Sym BracketR, tokenPos = $$ }}
-  '('         { Token { tokenType = Sym ParenL  , tokenPos = $$ }}
-  ')'         { Token { tokenType = Sym ParenR  , tokenPos = $$ }}
-  '{'         { Token { tokenType = Sym CurlyL  , tokenPos = $$ }}
-  '}'         { Token { tokenType = Sym CurlyR  , tokenPos = $$ }}
-  '_'         { Token { tokenType = Sym Underscore, tokenPos = $$ }}
-  '='         { Token { tokenType = Sym Eq, tokenPos = $$ }}
-  '\''        { Token { tokenType = Sym Quote, tokenPos = $$ }}
-  ','         { Token { tokenType = Sym Comma, tokenPos = $$ }}
-  '.'         { Token { tokenType = Sym Dot, tokenPos = $$ }}
-  ':'         { Token { tokenType = Sym Colon, tokenPos = $$ }}
-  ';'         { Token { tokenType = Sym Semi, tokenPos = $$ }}
-  '|'         { Token { tokenType = Sym Bar, tokenPos = $$ }}
+  '['           { Token { tokenType = Sym BracketL, tokenPos = $$ }}
+  ']'           { Token { tokenType = Sym BracketR, tokenPos = $$ }}
+  '('           { Token { tokenType = Sym ParenL  , tokenPos = $$ }}
+  ')'           { Token { tokenType = Sym ParenR  , tokenPos = $$ }}
+  '{'           { Token { tokenType = Sym CurlyL  , tokenPos = $$ }}
+  '}'           { Token { tokenType = Sym CurlyR  , tokenPos = $$ }}
+  '_'           { Token { tokenType = Sym Underscore, tokenPos = $$ }}
+  '='           { Token { tokenType = Sym Eq, tokenPos = $$ }}
+  '\''          { Token { tokenType = Sym Quote, tokenPos = $$ }}
+  ','           { Token { tokenType = Sym Comma, tokenPos = $$ }}
+  '.'           { Token { tokenType = Sym Dot, tokenPos = $$ }}
+  ':'           { Token { tokenType = Sym Colon, tokenPos = $$ }}
+  ';'           { Token { tokenType = Sym Semi, tokenPos = $$ }}
+  '|'           { Token { tokenType = Sym Bar, tokenPos = $$ }}
 
-  '<-'        { Token { tokenType = Op ArrowL, tokenPos = $$ }}
-  '->'        { Token { tokenType = Op ArrowR, tokenPos = $$ }}
-  '<->'       { Token { tokenType = Op ArrowLR, tokenPos = $$ }}
+  '<-'          { Token { tokenType = Op ArrowL, tokenPos = $$ }}
+  '->'          { Token { tokenType = Op ArrowR, tokenPos = $$ }}
+  '<->'         { Token { tokenType = Op ArrowLR, tokenPos = $$ }}
 
-  'theory'    { Token { tokenType = KW KW_theory, tokenPos = $$ }}
-  'end'       { Token { tokenType = KW KW_end,    tokenPos = $$ }}
-  'goal'      { Token { tokenType = KW KW_goal,   tokenPos = $$ }}
-  'use'       { Token { tokenType = KW KW_use,    tokenPos = $$ }}
-  'import'    { Token { tokenType = KW KW_import, tokenPos = $$ }}
-  'export'    { Token { tokenType = KW KW_export, tokenPos = $$ }}
-  'predicate' { Token { tokenType = KW KW_predicate, tokenPos = $$ }}
-  'function'  { Token { tokenType = KW KW_function, tokenPos = $$ }}
-  'constant'  { Token { tokenType = KW KW_constant, tokenPos = $$ }}
-  'axiom'     { Token { tokenType = KW KW_axiom, tokenPos = $$ }}
-  'lemma'     { Token { tokenType = KW KW_lemma, tokenPos = $$ }}
-  'type'      { Token { tokenType = KW KW_type, tokenPos = $$ }}
-  'with'      { Token { tokenType = KW KW_with, tokenPos = $$ }}
-  'as'        { Token { tokenType = KW KW_as,     tokenPos = $$ }}
+  'module'      { Token { tokenType = KW KW_module,     tokenPos = $$ }}
+  'theory'      { Token { tokenType = KW KW_theory,     tokenPos = $$ }}
+  'end'         { Token { tokenType = KW KW_end,        tokenPos = $$ }}
+  'goal'        { Token { tokenType = KW KW_goal,       tokenPos = $$ }}
+  'use'         { Token { tokenType = KW KW_use,        tokenPos = $$ }}
+  'import'      { Token { tokenType = KW KW_import,     tokenPos = $$ }}
+  'export'      { Token { tokenType = KW KW_export,     tokenPos = $$ }}
+  'predicate'   { Token { tokenType = KW KW_predicate,  tokenPos = $$ }}
+  'function'    { Token { tokenType = KW KW_function,   tokenPos = $$ }}
+  'constant'    { Token { tokenType = KW KW_constant,   tokenPos = $$ }}
+  'axiom'       { Token { tokenType = KW KW_axiom,      tokenPos = $$ }}
+  'lemma'       { Token { tokenType = KW KW_lemma,      tokenPos = $$ }}
+  'type'        { Token { tokenType = KW KW_type,       tokenPos = $$ }}
+  'with'        { Token { tokenType = KW KW_with,       tokenPos = $$ }}
+  'as'          { Token { tokenType = KW KW_as,         tokenPos = $$ }}
+  'assert'      { Token { tokenType = KW KW_assert,     tokenPos = $$ }}
 
-  'true'      { Token { tokenType = KW KW_true,  tokenPos = $$ }}
-  'false'     { Token { tokenType = KW KW_false, tokenPos = $$ }}
-  'forall'    { Token { tokenType = KW KW_forall,tokenPos = $$ }}
-  'exists'    { Token { tokenType = KW KW_exists,tokenPos = $$ }}
-  'not'       { Token { tokenType = KW KW_not,   tokenPos = $$ }}
-  '\\/'       { Token { tokenType = Op Disj,     tokenPos = $$ }}
-  '||'        { Token { tokenType = Op AsymDisj, tokenPos = $$ }}
-  '/\\'       { Token { tokenType = Op Conj,     tokenPos = $$ }}
-  '&&'        { Token { tokenType = Op AsymConj, tokenPos = $$ }}
+  'requires'    { Token { tokenType = KW KW_requires,   tokenPos = $$ }}
+  'ensures'     { Token { tokenType = KW KW_ensures,    tokenPos = $$ }}
+  'invariant'   { Token { tokenType = KW KW_invariant,  tokenPos = $$ }}
 
-  'if'        { Token { tokenType = KW KW_if, tokenPos = $$ }}
-  'match'     { Token { tokenType = KW KW_match, tokenPos = $$ }}
-  'then'      { Token { tokenType = KW KW_then, tokenPos = $$ }}
-  'else'      { Token { tokenType = KW KW_else, tokenPos = $$ }}
-  'let'       { Token { tokenType = KW KW_let, tokenPos = $$ }}
-  'in'        { Token { tokenType = KW KW_in, tokenPos = $$ }}
+  'true'        { Token { tokenType = KW KW_true,       tokenPos = $$ }}
+  'false'       { Token { tokenType = KW KW_false,      tokenPos = $$ }}
+  'forall'      { Token { tokenType = KW KW_forall,     tokenPos = $$ }}
+  'exists'      { Token { tokenType = KW KW_exists,     tokenPos = $$ }}
+  'not'         { Token { tokenType = KW KW_not,        tokenPos = $$ }}
+  '\\/'         { Token { tokenType = Op Disj,          tokenPos = $$ }}
+  '||'          { Token { tokenType = Op AsymDisj,      tokenPos = $$ }}
+  '/\\'         { Token { tokenType = Op Conj,          tokenPos = $$ }}
+  '&&'          { Token { tokenType = Op AsymConj,      tokenPos = $$ }}
+
+  'if'          { Token { tokenType = KW KW_if,         tokenPos = $$ }}
+  'match'       { Token { tokenType = KW KW_match,      tokenPos = $$ }}
+  'then'        { Token { tokenType = KW KW_then,       tokenPos = $$ }}
+  'else'        { Token { tokenType = KW KW_else,       tokenPos = $$ }}
+  'let'         { Token { tokenType = KW KW_let,        tokenPos = $$ }}
+  'in'          { Token { tokenType = KW KW_in,         tokenPos = $$ }}
+  'ghost'       { Token { tokenType = KW KW_ghost,      tokenPos = $$ }}
+  'for'         { Token { tokenType = KW KW_for,        tokenPos = $$ }}
+  'to'          { Token { tokenType = KW KW_to,         tokenPos = $$ }}
+  'do'          { Token { tokenType = KW KW_do,         tokenPos = $$ }}
+  'done'        { Token { tokenType = KW KW_done,       tokenPos = $$ }}
 
 
-%name theories theories
-%name theory theory
-%name pType type
-%name expr expr
-%tokentype { Token }
-%monad     { ParseM }
-%lexer     { lexerP } { Token { tokenType = EOF } }
+%name modules   modules
+%name pModule   module
+%name pType     type
+%name expr      expr
+%tokentype      { Token }
+%monad          { ParseM }
+%lexer          { lexerP } { Token { tokenType = EOF } }
 
 %nonassoc QUALID
 %nonassoc QUANT
 %nonassoc LET IF
 %nonassoc LABEL
+%nonassoc ASSERT
 %right '->' '<->'
 %right '\\/' '||'
 %right '/\\' '&&'
@@ -120,43 +132,52 @@ import qualified Control.Applicative as A
 %%
 
 --------------------------------------------------------------------------------
+modules :: { [Module] }
+  : modules_rev                 { reverse $1 }
 
-theories :: { [Theory] }
-  : theories_rev            { reverse $1 }
+modules_rev :: { [Module] }
+  :                             { [] }
+  | modules_rev module          { $2 : $1 }
 
-theories_rev :: { [Theory] }
-  :                         { [] }
-  | theories_rev theory     { $2 : $1 }
+module :: { Module }
+  : 'module' uident decls 'end' { Module $2 (reverse $3) }
 
-theory :: { Theory }
-  : 'theory' uident decls 'end' { Theory $2 (reverse $3) }
-
+--------------------------------------------------------------------------------
 decls :: { [Decl] }
   :                         { [] }
   | decls decl              { $2 : $1 }
 
 -- XXX: A lot of these are missing the 'with' part
 decl :: { Decl }
-  : 'use' imp_exp tqualid opt_as  { Use $2 $3 $4 }
+  : 'use' imp_exp tqualid opt_as        { Use $2 $3 $4 }
+
   | 'predicate' lident labels type_params
-                                  { Predicate $2 $3 (map snd $4) }
+                                        { Predicate $2 $3 (map snd $4) }
   | 'predicate' lident labels type_params '=' expr
-                                  { PredicateDef $2 $3 $4 $6 }
+                                        { PredicateDef $2 $3 $4 $6 }
+
   | 'function'  lident labels type_params ':' type
-                                  { Function $2 $3 (map snd $4) $6 }
+                                        { Function $2 $3 (map snd $4) $6 }
   | 'function'  lident labels type_params ':' type '=' expr
-                                  { FunctionDef $2 $3 $4 $6 $8 }
-  | 'constant' lident labels ':' type
-                                  { Function $2 $3 [] $5 }
-  | 'constant' lident labels ':' type '=' expr
-                                  { FunctionDef $2 $3 [] $5 $7 }
+                                        { FunctionDef $2 $3 $4 $6 $8 }
 
-  | 'axiom' ident ':' expr        { Axiom $2 $4 }
-  | 'lemma' ident ':' expr        { Lemma $2 $4 }
-  | 'goal'  ident ':' expr        { Goal $2 $4 }
+  | 'constant'  lident labels ':' type
+                                        { Function $2 $3 [] $5 }
+  | 'constant'  lident labels ':' type '=' expr
+                                        { FunctionDef $2 $3 [] $5 $7 }
 
-  | 'type' lident labels tyvars   { Type $2 $3 $4 }
-  | 'type' lident labels tyvars '=' type_defn{ TypeDef $2 $3 $4 $6 }
+  | 'axiom' ident ':' expr              { Axiom $2 $4 }
+
+  | 'lemma' ident ':' expr              { Lemma $2 $4 }
+
+  | 'goal'  ident ':' expr              { Goal $2 $4 }
+
+  | 'type'  lident labels tyvars        { Type $2 $3 $4 }
+  | 'type'  lident labels tyvars '=' type_defn
+  { TypeDef $2 $3 $4 $6 }
+
+  | 'let'   lident labels type_params ':' type specs '=' expr
+  { DLet $2 $3 $4 $6 (reverse $7) $9 }
 
 
 imp_exp :: { Maybe ImpExp }
@@ -167,6 +188,17 @@ imp_exp :: { Maybe ImpExp }
 opt_as :: { Maybe Name }
   : {- empty -}                   { Nothing }
   | 'as' uident                   { Just $2 }
+
+
+--------------------------------------------------------------------------------
+specs :: { [Spec] }
+  :                             { [] }
+  | specs spec                  { $2 : $1 }
+
+spec  :: { Spec }
+  : 'requires' '{' expr '}'     { Requires $3 }
+  | 'ensures'  '{' expr '}'     { Ensures  $3 }
+
 
 --------------------------------------------------------------------------------
 -- Types
@@ -207,6 +239,7 @@ typeA :: { Type }
   | '(' type ')'        { $2 }
   | '(' ')'             { Tuple [] }
   | '(' types2 ')'      { Tuple (reverse $2) }
+  | '{' type '}'        { TySnap $2 }
 
 typeAs :: { [Type] }
   : typeA               { [$1] }
@@ -229,15 +262,22 @@ type_params :: { [(Maybe Name, Type)] }
 
 -- NOT reversed!
 type_param :: { [ (Maybe Name, Type) ] }
-  : typeA                    { [ (Nothing, $1) ] }
+{-  : typeA                    { [ (Nothing, $1) ] }
+    TODO: this got broken.
+-}
 
   {- HACKERY:
   Next is the case for:  `x y z : Int`
   It is parsed like this so tha we can decide what to do with 1 look ahead.
   Technically, this is not fully correct because we'll also accept things like:
-  `x (y) : Int` but it seems close enough. -}
-  | '(' type ':' type ')'    {% mkTypeParam $2 >>= \xs -> return
-                                                  [ (Just x, $4) | x <- xs ] }
+  `x (y) : Int` but it seems close enough.
+
+  TODO: handle ghost parameter specifier cleanly
+  TODO: rework multiple parameter binding.
+  -}
+  : '(' ghost type ':' type ')'
+  {% mkTypeParam $3 >>= \xs -> return
+        [ (Just x, $5) | x <- xs ] }
 
 
 
@@ -312,8 +352,8 @@ expr :: { Expr }
   | 'match' revExprs1 'with' opt_bar
     revExprCases 'end'              { Match (reverse $2) (reverse $5) }
 
-  | 'let' pattern '=' expr
-    'in' expr      %prec LET        { Let $2 $4 $6 }
+  | 'let' ghost pattern '=' expr
+    'in' expr      %prec LET        { Let $2 $3 $5 $7 }
 
   | expr '->'  expr                 { Conn Implies $1 $3 }
   | expr '<->' expr                 { Conn Iff $1 $3 }
@@ -324,10 +364,26 @@ expr :: { Expr }
   | expr ':' type                   { Cast $1 $3 }
   | STR expr %prec LABEL            { Labeled $1 $2 }
   | 'not' expr                      { Not $2 }
+
   | quant binders1 opt_trig '.' expr %prec QUANT
-                                    { Quant $1 (concat (reverse $2)) $3 $5 }
+  { Quant $1 (concat (reverse $2)) $3 $5 }
 
+  | 'assert' '{' expr '}' ';' expr %prec ASSERT
+  { Assert $3 $6 }
 
+  | 'for' lident '=' expr 'to' expr 'do' invariants expr 'done'
+  { For $2 $4 $6 $8 $9 }
+
+invariants :: { [Expr] }
+  :                                 { [] }
+  | invariant invariants            { $1 : $2 }
+
+invariant  :: { Expr }
+  : 'invariant' '{' expr '}'        { $3 }
+
+ghost :: { Bool }
+  :                                 { False }
+  | 'ghost'                         { True  }
 
 quant :: { Quant }
   : 'forall'                        { Forall }
@@ -357,7 +413,7 @@ exprA :: { Expr }
   | REAL                            { Lit $ Real $1 }
   | 'true'                          { Lit $ Bool True }
   | 'false'                         { Lit $ Bool False }
-  | qualid                          { App $1 [] }
+  | qualid                          { Var $1 }
   | BANG_OP exprA                   { App $1 [$2] }
   | exprA '[' expr ']'              { App "[]" [$1, $3] }
   | exprA '[' expr '<-' expr ']'    { App "[<-]" [$1, $3, $5] }
@@ -439,10 +495,12 @@ instance A.Applicative ParseM where
 
 instance Monad ParseM where
   return a  = P (\x -> Right (a,x))
-  fail x    = P (\_ -> Left x)
   P m >>= f = P (\x -> case m x of
                          Left err -> Left err
                          Right (a,y)  -> unP (f a) y)
+
+instance MonadFail ParseM where
+  fail x    = P (\_ -> Left x)
 
 
 lexerP :: (Token -> ParseM a) -> ParseM a

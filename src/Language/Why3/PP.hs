@@ -1,15 +1,17 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE PatternGuards #-}
-module Language.Why3.PP (ppTh, ppD, ppE, ppT, ppL, ppP, isOpWhy3) where
-
+module Language.Why3.PP
+        (ppModule, ppD, ppE, ppT, ppL, ppP, isOpWhy3) where
+import Prelude hiding ((<>))
 import Language.Why3.AST
 import Text.PrettyPrint
 import           Data.Text (Text)
 import qualified Data.Text as Text
 
-ppTh :: Theory -> Doc
-ppTh (Theory x ds) = text "theory" <+> ppText x
-                  $$ vcat (map ppD ds) $$ text "end"
+ppModule :: Module -> Doc
+ppModule (Module x ds)
+        = text "module" <+> ppText x
+        $$ vcat (map ppD ds) $$ text "end"
 
 ppD :: Decl -> Doc
 ppD decl =
@@ -112,9 +114,16 @@ ppE = go 0
         wrap 6 prec (go 5 e1 <> brackets (go 0 e2 <+> text "<-" <+> go 0 e3))
       App x []                -> ppText x
       App x es                -> wrap 5 prec (ppText x <+> fsep (map (go 5) es))
-      Let p e1 e2             ->
+
+      Let False p e1 e2             ->
         wrap 1 prec (text "let" <+> ppP p <+> text "=" <+>
                                           go 0 e1 <+> text "in" $$ go 0 e2)
+
+      Let True p e1 e2             ->
+        wrap 1 prec (text "let ghost" <+> ppP p <+> text "=" <+>
+                                          go 0 e1 <+> text "in" $$ go 0 e2)
+
+
       If e1 e2 e3             -> wrap 1 prec
           (text "if" <+> go 0 e1
                 $$ nest 2 (text "then" <+> go 0 e2 $$

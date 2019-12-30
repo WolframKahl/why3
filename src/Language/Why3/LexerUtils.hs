@@ -160,48 +160,62 @@ data TokenT   = Num Integer Int       -- ^ value, base
 data TokenW   = BlockComment | Space
                 deriving (Eq,Show)
 
-data TokenKW  = KW_if    | KW_then | KW_else
-              | KW_let   | KW_in
-              | KW_match | KW_with | KW_end
-              | KW_as
-              | KW_forall | KW_exists | KW_not | KW_true | KW_false
+data TokenKW
+        = KW_if    | KW_then | KW_else
+        | KW_let   | KW_in
+        | KW_match | KW_with | KW_end
+        | KW_for   | KW_to   | KW_do | KW_done
 
-              | KW_theory
-              | KW_type
-              | KW_constant
-              | KW_function
-              | KW_predicate
-              | KW_inductive
-              | KW_coinductive
-              | KW_axiom
-              | KW_lemma
-              | KW_goal
-              | KW_use
-              | KW_clone
-              | KW_namespace
-              | KW_import
-              | KW_export
-               deriving (Eq,Show)
+        | KW_as
+        | KW_forall | KW_exists | KW_not | KW_true | KW_false
 
-data TokenOp  = ArrowL | ArrowR | ArrowLR
-              | AsymDisj | Disj | AsymConj | Conj
-              | BangOp
-              | OtherOp Int        -- operator level
-                deriving (Eq,Show)
 
-data TokenSym = Comma | Dot | Semi | Colon | Quote
-              | Eq | Underscore | Bar
-              | ParenL   | ParenR
-              | BracketL | BracketR
-              | CurlyL   | CurlyR
-                deriving (Eq,Show)
+        | KW_module
+        | KW_theory
+        | KW_type
+        | KW_constant
+        | KW_function
+        | KW_predicate
+        | KW_inductive
+        | KW_coinductive
+        | KW_axiom
+        | KW_lemma
+        | KW_goal
+        | KW_use
+        | KW_clone
+        | KW_namespace
+        | KW_import
+        | KW_export
+        | KW_assert
+        | KW_ghost
 
-data TokenErr = UnterminatedComment
-              | UnterminatedString
-              | UnterminatedChar
-              | InvalidString
-              | InvalidChar
-              | LexicalError
-                deriving (Eq,Show)
+        | KW_requires
+        | KW_ensures
+        | KW_invariant
+        deriving (Eq,Show)
+
+data TokenOp
+        = ArrowL | ArrowR | ArrowLR
+        | AsymDisj | Disj | AsymConj | Conj
+        | BangOp
+        | OtherOp Int        -- operator level
+        deriving (Eq,Show)
+
+data TokenSym
+        = Comma | Dot | Semi | Colon | Quote
+        | Eq | Underscore | Bar
+        | ParenL   | ParenR
+        | BracketL | BracketR
+        | CurlyL   | CurlyR
+        deriving (Eq,Show)
+
+data TokenErr
+        = UnterminatedComment
+        | UnterminatedString
+        | UnterminatedChar
+        | InvalidString
+        | InvalidChar
+        | LexicalError
+        deriving (Eq,Show)
 
 
