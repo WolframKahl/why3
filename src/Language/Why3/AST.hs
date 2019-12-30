@@ -97,3 +97,4 @@ instance NFData Type where
       TyCon x xs -> rnf x `seq` rnf xs
       TyVar x    -> rnf x
       Tuple ts   -> rnf ts
+      TySnap t   -> rnf t

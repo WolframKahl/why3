@@ -1,9 +1,4 @@
 {-# LANGUAGE CPP #-}
-
-#ifndef MIN_VERSION_base
-#define MIN_VERSION_base(x,y,z) 1
-#endif
-
 -- | Functions for working with names.
 module Language.Why3.Names
   ( countUses
@@ -28,30 +23,40 @@ import qualified Data.Text as Text
 freeNames :: Expr -> Set Name
 freeNames = Map.keysSet . countUses
 
+
 -- | Count the uses of free names in an expression.
 countUses :: Expr -> Map Name Int
-countUses = getCount . go
-  where
+countUses
+ = getCount . go
+ where
   go sh =
-    case sh of
-      Lit _             -> mempty
-      App x es          -> countOne x <> foldMap go es
-      If e1 e2 e3       -> go e1 <> go e2 <> go e3
-      Conn _ e1 e2      -> go e1 <> go e2
-      Not e             -> go e
-      Field _ e         -> go e
-      Record es         -> foldMap (go . snd) es
-      RecordUpdate e es -> go e <> foldMap (go . snd) es
-      Cast e _          -> go e
-      Labeled _ e       -> go e
+   case sh of
+        Lit _             -> mempty
+        Var x             -> countOne x
+        App x es          -> countOne x <> foldMap go es
+        If e1 e2 e3       -> go e1 <> go e2 <> go e3
+        Conn _ e1 e2      -> go e1 <> go e2
+        Not e             -> go e
+        Field _ e         -> go e
+        Record es         -> foldMap (go . snd) es
+        RecordUpdate e es -> go e <> foldMap (go . snd) es
+        Cast e _          -> go e
+        Labeled _ e       -> go e
+        Assert e1 e2      -> go e1 <> go e2
 
-      -- cases with shadowing
-      Quant _ xs _ e -> forgetMany (map fst xs) (go e)
-      Match es as    -> foldMap go es <> foldMap alt as
-          where alt (p,e) = forgetMany (Set.toList (patDefines p)) (go e)
+        -- cases with variable binding.
+        For n e1 e2 es e3
+         -> forget n (go e1 <> go e2 <> foldMap go es <> go e3)
 
-      Let _b p e1 e2
-       -> go e1 <> forgetMany (Set.toList (patDefines p)) (go e2)
+        Quant _ xs _ e
+         -> forgetMany (map fst xs) (go e)
+
+        Match es as
+         -> foldMap go es <> foldMap alt as
+         where alt (p,e) = forgetMany (Set.toList (patDefines p)) (go e)
+
+        Let _b p e1 e2
+         -> go e1 <> forgetMany (Set.toList (patDefines p)) (go e2)
 
 countOne :: k -> Count k
 countOne k = Count (Map.singleton k 1)
@@ -91,31 +96,37 @@ rename used0 = go (Map.fromList [ (x,x) | x <- Set.toList used0 ])
   go :: Map Name Name -> Expr -> Expr
   go nm expr =
     case expr of
-      Lit _               -> expr
+        Lit _             -> expr
 
-      App x es            -> App (getName nm x) (map (go nm) es)
+        App x es          -> App (getName nm x) (map (go nm) es)
+        Var x             -> Var (getName nm x)
 
-      Let b p e1 e2
-       -> let (nm1,p1) = renP nm p
-          in  Let b p1 (go nm e1) (go nm1 e2)
+        Let b p e1 e2
+         -> let (nm1,p1) = renP nm p
+            in  Let b p1 (go nm e1) (go nm1 e2)
 
-      Quant q xs trs e    -> let (nm1, ys) = mapAccumL renQ nm xs
-                             in Quant q ys (map (map (go nm1)) trs) (go nm1 e)
-        where renQ nm1 (x,t) = let (nm2, y) = pickName nm1 x
-                               in (nm2, (y,t))
+        Quant q xs trs e
+         -> let (nm1, ys) = mapAccumL renQ nm xs
+            in Quant q ys (map (map (go nm1)) trs) (go nm1 e)
+         where renQ nm1 (x,t)
+                = let (nm2, y) = pickName nm1 x
+                  in (nm2, (y,t))
 
-      If e1 e2 e3         -> If (go nm e1) (go nm e2) (go nm e3)
-      Match es alts       -> Match (map (go nm) es)
-                           $ map (renAlt nm) alts
+        If e1 e2 e3       -> If (go nm e1) (go nm e2) (go nm e3)
+        Match es alts     -> Match (map (go nm) es) $ map (renAlt nm) alts
+        Conn c e1 e2      -> Conn c (go nm e1) (go nm e2)
+        Not e             -> Not (go nm e)
+        Field l e         -> Field l (go nm e)
+        Record fs         -> Record [ (x, go nm e) | (x,e) <- fs ]
+        RecordUpdate r fs -> RecordUpdate (go nm r) [ (x, go nm e) | (x,e) <- fs ]
+        Cast e t          -> Cast (go nm e) t
+        Labeled l e       -> Labeled l (go nm e)
+        Assert e1 e2      -> Assert (go nm e1) (go nm e2)
 
-      Conn c e1 e2        -> Conn c (go nm e1) (go nm e2)
-      Not e               -> Not (go nm e)
-      Field l e           -> Field l (go nm e)
-      Record fs           -> Record [ (x, go nm e) | (x,e) <- fs ]
-      RecordUpdate r fs   -> RecordUpdate (go nm r) [ (x, go nm e) | (x,e) <- fs ]
+        For x e1 e2 es3 e4
+         -> let (nm1, y) = pickName nm x
+            in  For y (go nm1 e1) (go nm1 e2) (map (go nm1) es3) (go nm e4)
 
-      Labeled l e         -> Labeled l (go nm e)
-      Cast e t            -> Cast (go nm e) t
 
   renAlt nm (p,e) = let (nm1,p1) = renP nm p
                     in (p1, go nm1 e)
@@ -124,59 +135,67 @@ rename used0 = go (Map.fromList [ (x,x) | x <- Set.toList used0 ])
     case pat of
       PWild     -> (nm, PWild)
       PVar x    -> let (nm1, y) = pickName nm x
-                in (nm1, PVar y)
+                   in  (nm1, PVar y)
       PCon c ps -> let (nm1, ps1) = mapAccumL renP nm ps
                    in (nm1, PCon c ps1)
 
 
--- | Apply a substitution to an exprssion.
--- WARNING: This assumes that no capturing of variables will occur.
--- This function treats names without arguments applied to them as the
--- variables elligible for substitution.
+-- | Apply a substitution to an expression.
+--   WARNING: This assumes that no capturing of variables will occur.
+--   This function treats names without arguments applied to them as the
+--   variables elligible for substitution.
 apSubst :: Map Name Expr -> Expr -> Expr
 apSubst = go
   where
   go env expr =
     case expr of
-      Lit _               -> expr
+        Lit _             -> expr
 
-      App x []            -> Map.findWithDefault expr x env
-      App x es            -> App x (map (go env) es)
+        Var x             -> Map.findWithDefault expr x env
+        App x []          -> Map.findWithDefault expr x env
+        App x es          -> App x (map (go env) es)
 
-      Match es alts -> Match (map (go env) es) $ map inAlt alts
-        where
-        -- Here we assume no capture
-        inAlt (p,e) =
-          let defs = patDefines p
-              env1 = Map.filterWithKey (\x _ -> not (x `Set.member` defs)) env
-          in (p, go env1 e)
+        Match es alts
+         -> Match (map (go env) es) $ map inAlt alts
+         where
+          -- Here we assume no capture
+          inAlt (p,e) =
+            let defs = patDefines p
+                env1 = Map.filterWithKey (\x _ -> not (x `Set.member` defs)) env
+            in (p, go env1 e)
 
-      -- Here we assume no captrue
-      Let bGhost p e1 e2
-       -> Let bGhost p (go env e1) (go env1 e2)
-       where
-        env1 = let defs = patDefines p
-               in Map.filterWithKey (\x _ -> not (x `Set.member` defs)) env
+        -- Here we assume no captrue
+        Let bGhost p e1 e2
+         -> Let bGhost p (go env e1) (go env1 e2)
+         where
+          env1 = let defs = patDefines p
+                 in Map.filterWithKey (\x _ -> not (x `Set.member` defs)) env
 
-      -- Here we assume no captrue
-      Quant q as trs e ->
-        let env1 = foldr (Map.delete . fst) env as
-        in Quant q as (map (map (go env1)) trs) (go env1 e)
+        -- Here we assume no captrue
+        Quant q as trs e ->
+          let env1 = foldr (Map.delete . fst) env as
+          in Quant q as (map (map (go env1)) trs) (go env1 e)
 
 
-      If e1 e2 e3         -> If (go env e1) (go env e2) (go env e3)
-      Conn c e1 e2        -> Conn c (go env e1) (go env e2)
-      Not e               -> Not (go env e)
-      Field l e           -> Field l (go env e)
-      Record fs           -> Record [ (x, go env e) | (x,e) <- fs ]
-      RecordUpdate r fs   -> RecordUpdate (go env r) [ (x, go env e) | (x,e) <- fs ]
+        If e1 e2 e3       -> If (go env e1) (go env e2) (go env e3)
+        Conn c e1 e2      -> Conn c (go env e1) (go env e2)
+        Not e             -> Not (go env e)
+        Field l e         -> Field l (go env e)
+        Record fs         -> Record [ (x, go env e) | (x,e) <- fs ]
+        RecordUpdate r fs -> RecordUpdate (go env r) [ (x, go env e) | (x,e) <- fs ]
+        Cast e t          -> Cast (go env e) t
+        Labeled l e       -> Labeled l (go env e)
+        Assert e1 e2      -> Assert (go env e1) (go env e2)
 
-      Cast e t            -> Cast (go env e) t
-      Labeled l e         -> Labeled l (go env e)
+        For n e1 e2 es3 e4 ->
+         let defs = Set.singleton n
+             env1 = Map.filterWithKey (\x _ -> not (x `Set.member` defs)) env
+         in  For n (go env1 e1) (go env1 e2) (map (go env1) es3) (go env1 e4)
+
 
 patDefines :: Pattern -> Set Name
 patDefines pat =
   case pat of
-    PWild     -> Set.empty
-    PVar x    -> Set.singleton x
-    PCon _ ps -> Set.unions (map patDefines ps)
+        PWild     -> Set.empty
+        PVar x    -> Set.singleton x
+        PCon _ ps -> Set.unions (map patDefines ps)

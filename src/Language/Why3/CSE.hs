@@ -55,6 +55,9 @@ importFormula expr =
     Lit (Bool {}) -> return expr
     Lit _         -> error "Not a formula: non-boolean literal"
 
+    Var x ->
+      return $ seq x (Var x)
+
     App x es ->
       do ts <- mapM importTerm es
          return $ seq x (App x ts)
@@ -76,19 +79,13 @@ importFormula expr =
                       e2' <- importFormula e2
                       return (Let bGhost p e1' e2')
 
-    -- XXX: No sharing across qunatifiers.
+    -- XXX: No sharing across quantifiers.
     Quant q xs ts e ->
       do k <- get
          case cseFormula (sNext k, e) of
            (sNext', e') ->
               do set $! k { sNext = sNext' }
                  return (Quant q xs ts e')
-
-    Field {}      -> error "Not a formula: field"
-    Record {}     -> error "Not a formula: record"
-    RecordUpdate {} -> error "Not a formula: record update"
-    Cast {}       -> error "Not a formula: cast"
-    Match {}      -> error "Not a formula: match"
 
     Labeled l e   ->
       do e' <- importFormula e
@@ -103,10 +100,20 @@ importFormula expr =
       do e' <- importFormula e
          return (Not e')
 
+    Field {}        -> error "Not a formula: field"
+    Record {}       -> error "Not a formula: record"
+    RecordUpdate {} -> error "Not a formula: record update"
+    Cast {}         -> error "Not a formula: cast"
+    Match {}        -> error "Not a formula: match"
+    Assert {}       -> error "Not a formula: assert"
+    For {}          -> error "Not a formula: for"
+
+
 importTerm :: Expr -> M Simple
 importTerm expr =
   case expr of
     Lit {}      -> return expr
+    Var !_      -> return expr
     App !_ []   -> return expr
     App !x es   -> compound (App x) es
     Field l e   -> compound (\[a] -> Field l a) [e]
@@ -133,6 +140,8 @@ importTerm expr =
     Quant {}    -> error "Not a term: quant"
     Conn {}     -> error "Not a term: conn"
     Not {}      -> error "Not a term: not"
+    Assert {}   -> error "Not a term: assert"
+    For {}      -> error "Not a term: for"
 
 compound :: ([Simple] -> Shape) -> [Expr] -> M Simple
 compound mk es =

@@ -85,6 +85,8 @@ prism' bt seta =
 --
 
 exprPlate                      :: Applicative f => (Expr -> f Expr) -> (Expr -> f Expr)
+exprPlate _ (Lit l)             = pure (Lit l)
+exprPlate _ (Var n)             = pure (Var n)
 exprPlate f (App n es)          = App n <$> traverse f es
 exprPlate f (Let b ps e1 e2)    = Let b ps <$> f e1 <*> f e2
 exprPlate f (If e1 e2 e3)       = If <$> f e1 <*> f e2 <*> f e3
@@ -97,7 +99,9 @@ exprPlate f (Record fs)         = Record <$> traverse (_2 f) fs
 exprPlate f (RecordUpdate e fs) = RecordUpdate <$> f e <*> traverse (_2 f) fs
 exprPlate f (Cast e t)          = (`Cast` t) <$> f e
 exprPlate f (Labeled n e)       = Labeled n <$> f e
-exprPlate _ (Lit l)             = pure (Lit l)
+exprPlate f (Assert e1 e2)      = Assert <$> f e1 <*> f e2
+exprPlate f (For n e1 e2 es3 e4)
+ = For n <$> f e1 <*> f e2 <*> traverse f es3 <*> f e4
 
 -- Expr Prisms
 
