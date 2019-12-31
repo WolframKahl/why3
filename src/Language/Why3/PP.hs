@@ -11,7 +11,7 @@ import qualified Data.Text as Text
 
 ppModule :: Module -> Doc
 ppModule (Module x ds)
-        = text "module" <+> ppText x
+        =  text "module" <+> ppText x
         $$ vcat (map ppDecl ds) $$ text "end"
 
 
@@ -43,12 +43,13 @@ ppDecl decl =
                 TyCase tcs -> vcat $ map ppTyCaseAlt tcs
 
         Predicate x _ ts
-         -> text "predicate" <+> ppText x <+> fsep (map (ppPrecT 1) ts)
+         -> text "predicate" <+> ppText x
+         $$ nest 4 (fsep (map (ppPrecT 1) ts))
 
         PredicateDef x _ ps e
          -> text "predicate" <+> ppText x
-         <+> fsep (map ppParam ps)
-         <+> text "=" <+> ppE e
+         $$ nest 4 (fsep (map ppParam ps))
+         $$ nest 2 (text "=" <+> ppE e)
 
         Function x _ [] t
          -> text "constant" <+> ppText x <> colon <+> ppT t
@@ -73,11 +74,10 @@ ppDecl decl =
                 <+> text "=" <+> ppE e
 
         DLet x _ ps t _ss e     -- TODO: print specs
-         -> text "let"
-                <+> ppText x
-                <+> fsep (map ppParam ps)
-                <+> colon <+> ppT t
-                <+> text "=" <+> ppE e
+         -> text "let" <+> ppText x
+         $$ nest 4 (fsep (map ppParam ps))
+         $$ nest 4 (colon <+> ppT t)
+         $$ nest 2 (text "=" <+> ppE e)
 
   where
   ppF (x,t) = ppText x <> colon <+> ppT t
@@ -205,7 +205,9 @@ ppE = go 0
 
 
         Record fs
-         -> braces (sep [ ppText x <+> text "=" <+> go 0 e | (x,e) <- fs ])
+         -> braces
+         $  sep [ ppText x <+> text "=" <+> go 0 e <> semi
+                | (x,e) <- fs ]
 
         RecordUpdate r fs
          -> braces (go 0 r <+> text "with" <+>
@@ -217,13 +219,16 @@ ppE = go 0
         Labeled l e     -> wrap 1 prec (text (show l) <+> go 1 e)
 
         Assert e1 e2
-         -> wrap 1 prec (text "assert" <+> braces (ppE e1) <> semi <+> ppE e2)
+         -> wrap 1 prec
+         $  text "assert" <+> braces (ppE e1) <> semi
+         $$ ppE e2
 
         For x eFrom eTo _esSpec eBody   -- TODO: print specs
          ->  wrap 1 prec
          $   text "for"
-         <+> ppText x  <+> ppText "=" <+> ppE eFrom <+> text "to" <+> ppE eTo
-         <+> text "do" <+> ppE  eBody <+> text "done"
+         <+> ppText x  <+> ppText "=" <+> ppE eFrom <+> text "to" <+> ppE eTo <+> text "do"
+         $$  nest 4 (ppE  eBody)
+         $$  text "done"
 
 
 ppP :: Pattern -> Doc
