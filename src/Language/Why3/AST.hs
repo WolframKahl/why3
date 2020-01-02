@@ -22,7 +22,7 @@ data Decl
         | PredicateDef  Name [Text] [(Maybe Name,Type)] Expr
         | Function      Name [Text] [Type] Type
         | FunctionDef   Name [Text] [(Maybe Name, Type)] Type Expr
-        | DLet          Name [Text] [(Maybe Name, Type)] Type [Spec] Expr
+        | DLet          Name [Text] [ParamLet] Type [Spec] Expr
         deriving (Eq,Ord,Read,Show,Generic,Typeable,Data)
 
 data TypeDef
@@ -48,6 +48,13 @@ data Literal
 data Spec
         = Requires      Expr
         | Ensures       Expr
+        deriving (Eq,Ord,Read,Show,Generic,Typeable,Data)
+
+data ParamLet
+        = PParamLet
+        { paramGhost    :: Bool
+        , paramName     :: Name
+        , paramType     :: Type }
         deriving (Eq,Ord,Read,Show,Generic,Typeable,Data)
 
 data Expr

@@ -75,7 +75,7 @@ ppDecl decl =
 
         DLet x _ ps t _ss e     -- TODO: print specs
          -> text "let" <+> ppText x
-         $$ nest 4 (fsep (map ppParam ps))
+         $$ nest 4 (fsep (map ppParamLet ps))
          $$ nest 4 (colon <+> ppT t)
          $$ nest 2 (text "=" <+> ppE e)
 
@@ -86,6 +86,11 @@ ppDecl decl =
 
   ppParam (Nothing, t) = ppPrecT 1 t
   ppParam (Just x, t)  = parens (ppText x <> colon <+> ppT t)
+
+  ppParamLet (PParamLet True name t)
+   = parens (text "ghost" <+> ppText name <> colon <+> ppT t)
+  ppParamLet (PParamLet False name t)
+   = parens (ppText name <> colon <+> ppT t)
 
   opt _ Nothing   = empty
   opt f (Just x)  = f x

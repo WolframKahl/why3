@@ -176,7 +176,7 @@ decl :: { Decl }
   | 'type'  lident labels tyvars '=' type_defn
   { TypeDef $2 $3 $4 $6 }
 
-  | 'let'   lident labels type_params ':' type specs '=' expr
+  | 'let'   lident labels params_let ':' type specs '=' expr
   { DLet $2 $3 $4 $6 (reverse $7) $9 }
 
 
@@ -278,6 +278,29 @@ type_param :: { [ (Maybe Name, Type) ] }
   : '(' ghost type ':' type ')'
   {% mkTypeParam $3 >>= \xs -> return
         [ (Just x, $5) | x <- xs ] }
+
+
+
+-- NOT reversed
+params_let :: { [ParamLet] }
+  : {- empty -}              { [] }
+  | params_let param_let   { $1 ++ $2 }
+
+-- NOT reversed!
+param_let :: {  [ParamLet] }
+
+  {- HACKERY:
+  Next is the case for:  `x y z : Int`
+  It is parsed like this so tha we can decide what to do with 1 look ahead.
+  Technically, this is not fully correct because we'll also accept things like:
+  `x (y) : Int` but it seems close enough.
+
+  TODO: handle ghost parameter specifier cleanly
+  TODO: rework multiple parameter binding.
+  -}
+  : '(' ghost type ':' type ')'
+  {% mkTypeParam $3 >>= \xs -> return
+        [ PParamLet $2 x $5 | x <- xs ] }
 
 
 
