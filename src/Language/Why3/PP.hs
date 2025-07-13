@@ -187,7 +187,7 @@ ppE = go 0
                      AsymAnd -> "&&"
                      Or      -> "\\/"
                      AsymOr  -> "||"
-                     Implies -> "->"
+                     -- Implies -> "->" -- covered above
                      Iff     -> "<->"
 
         Not  e

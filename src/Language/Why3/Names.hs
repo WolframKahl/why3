@@ -1,4 +1,3 @@
-{-# LANGUAGE CPP #-}
 -- | Functions for working with names.
 module Language.Why3.Names
   ( countUses
@@ -70,12 +69,10 @@ forgetMany ks count = foldl' (flip forget) count ks
 newtype Count k = Count { getCount :: Map k Int }
 
 instance Ord k => Semigroup (Count k) where
-  (<>) = mappend
+  (<>) (Count x) (Count y) = Count (MapStrict.unionWith (+) x y)
 
 instance Ord k => Monoid (Count k) where
   mempty = Count Map.empty
-  mappend (Count x) (Count y) = Count (MapStrict.unionWith (+) x y)
-
 
 -- | Rename an expression to avoid all shadowing.  The input parameters is
 -- a set of names that are already in scope and, therefore, should be renamed.
@@ -87,8 +84,9 @@ rename used0 = go (Map.fromList [ (x,x) | x <- Set.toList used0 ])
                                           | n <- [ (1 :: Integer) .. ] ]
 
   pickName :: Map Name Name -> Name -> (Map Name Name, Name)
-  pickName used x = let Just y = find (`Map.notMember` used) (variants x)
-                    in (Map.insert x y used, y)
+  pickName used x = case find (`Map.notMember` used) (variants x) of
+                      Just y -> (Map.insert x y used, y)
+                      Nothing -> error "IMPOSSIBLE"
 
   getName :: Map Name Name -> Name -> Name
   getName nm x = Map.findWithDefault x x nm

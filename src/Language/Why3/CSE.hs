@@ -31,13 +31,14 @@ cseFormula (startName,e) =
   k0                        = S { sMap = Map.empty, sNext = startName }
   defTime (_,(i,_))         = i
 
-  mkLet (d,(_,~(App i _))) (useMap,e1) =
+  mkLet (d,(_,(App i _))) (useMap,e1) =
     let newUses = Map.unionWith (+) (countUses d) (Map.delete i useMap)
     in ( newUses
        , case Map.lookup i useMap of
            Just 1 -> apSubst (Map.singleton i d) e1
            _      -> Let False (PVar i) d e1
        )
+  mkLet _ _ = error "IMPOSSIBLE"
 
 
 type Shape  = Expr    -- Sub-expressions are all variable or literal
@@ -116,12 +117,27 @@ importTerm expr =
     Var !_      -> return expr
     App !_ []   -> return expr
     App !x es   -> compound (App x) es
-    Field l e   -> compound (\[a] -> Field l a) [e]
-    Record fs   -> compound (\es -> Record (zip (map fst fs) es)) (map snd fs)
-    RecordUpdate r fs -> compound (\(s:es) -> RecordUpdate s (zip (map fst fs) es)) (r : map snd fs)
-    Cast e t    -> compound (\[a] -> Cast a t) [e]
-    If e1 e2 e3 -> compound (\[a,b,c] -> If a b c) [e1,e2,e3]
-    Labeled l e -> compound (\[a] -> Labeled l a) [e]
+    Field l e   -> compound (\ es -> case es of
+                                [a] -> Field l a
+                                _ -> error "IMPOSSIBLE"
+                            ) [e]
+    Record fs   -> compound (\ es -> Record (zip (map fst fs) es)) (map snd fs)
+    RecordUpdate r fs -> compound (\ es -> case es of
+                                (s:es') -> RecordUpdate s (zip (map fst fs) es')
+                                _ -> error "IMPOSSIBLE"
+                            ) (r : map snd fs)
+    Cast e t    -> compound (\ es -> case es of
+                                [a] -> Cast a t
+                                _ -> error "IMPOSSIBLE"
+                            ) [e]
+    If e1 e2 e3 -> compound (\ es -> case es of
+                                [a,b,c] -> If a b c
+                                _ -> error "IMPOSSIBLE"
+                            ) [e1,e2,e3]
+    Labeled l e -> compound (\ es -> case es of
+                                [a] -> Labeled l a
+                                _ -> error "IMPOSSIBLE"
+                            ) [e]
 
     Match {}    -> error "XXX: importTerm Match"
 
